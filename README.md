@@ -1,0 +1,3 @@
+This is an example of how to run a function at regular intervals, but more than a simple loop with calls to `std::this_thread::sleep_for(some_time);`. It compensates for the time used by the called function.
+
+I thought it would be a good idea to include a random jitter to adjust the actual interval by a small amount. In a large, distributed environment, we might have thousands of clients attempting to connect to a server, or sending a heartbeat signal to that server (to let the server know the client is still online). The network and server will probably function better if those clients don't all send their packets simultaneously. I've heard of such things happening, and it makes devops sad.
