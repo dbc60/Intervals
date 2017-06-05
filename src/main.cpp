@@ -83,6 +83,11 @@ public:
     smallest() {
         return smallest_.count();
     }
+
+    std::chrono::microseconds::rep
+    median() {
+        return jitters_[jitters_.size() / 2].count();
+    }
 };
 
 
@@ -94,4 +99,5 @@ void main() {
     std::cout << "Average jitter is " << jitters.average() << std::endl;
     std::cout << "Smallest jitter is " << jitters.smallest() << std::endl;
     std::cout << "Largest jitter is " << jitters.largest() << std::endl;
+    std::cout << "Median jitter is " << jitters.median() << std::endl;
 }
