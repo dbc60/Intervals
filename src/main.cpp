@@ -96,8 +96,8 @@ void main() {
 
     doItRepeatedly(std::bind(&Jitters::insert, &jitters, std::placeholders::_1), COUNT_REPEAT);
 
-    std::cout << "Average jitter is " << jitters.average() << std::endl;
-    std::cout << "Smallest jitter is " << jitters.smallest() << std::endl;
-    std::cout << "Largest jitter is " << jitters.largest() << std::endl;
-    std::cout << "Median jitter is " << jitters.median() << std::endl;
+    std::cout << "Smallest jitter is: " << jitters.smallest() << std::endl;
+    std::cout << "Largest jitter is:  " << jitters.largest() << std::endl;
+    std::cout << "Average jitter is:  " << jitters.average() << std::endl;
+    std::cout << "Median jitter is:   " << jitters.median() << std::endl;
 }
