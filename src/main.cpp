@@ -90,6 +90,7 @@ private:
     int doItTimed(std::function<void(duration)> doIt) {
         TimeDurations durations;
         int result = 0;
+        int missedIntervals = 0;
         std::random_device seedGenerator;
         std::mt19937 gen(seedGenerator());
         std::uniform_int_distribution<> distribution(IntervalMin,
@@ -97,7 +98,8 @@ private:
         resolution jitter = resolution(distribution(gen));
         firstInterval_ = my_clock::now();
         my_clock::time_point start{firstInterval_};
-        my_clock::time_point startNext{firstInterval_};
+        my_clock::time_point startNext{start + INTERVAL_PERIOD};
+        my_clock::time_point endNext(startNext + INTERVAL_PERIOD) ;
 
         while (is_running_) {
             // Delay the function call for a small random amount of time.
@@ -105,8 +107,6 @@ private:
             doIt(jitter);
             ++result;
 
-            // Calculate the next time we want to iterate
-            startNext = start + INTERVAL_PERIOD;
             auto currentTime = my_clock::now();
             durations.insert(currentTime - start);
             std::chrono::steady_clock::time_point jitter_time = start + jitter;
@@ -125,23 +125,27 @@ private:
             on my old 2.4 GHz core i5 desktop, running Windows 10. That seems
             excessive.
             */
-            if (currentTime < startNext) {
+            if (currentTime < endNext) {
                 // Wait for the next period start time
                 std::this_thread::sleep_until(startNext);
             } else {
-                std::cout << "Warning: Missed interval " << result
-                    << ". Jitter: " << jitter.count() << ". Jitter duration: "
-                    << time_span_jitter.count() << ". Duration: "
-                    << time_span_actual.count() << ". Interval Limit: "
-                    << time_span_expected.count() << std::endl;
+                //std::cout << "Warning: Missed interval " << result
+                //    << ". Jitter: " << jitter.count() << ". Jitter duration: "
+                //    << time_span_jitter.count() << ". Duration: "
+                //    << time_span_actual.count() << ". Interval Limit: "
+                //    << time_span_expected.count() << std::endl;
+                ++missedIntervals;
             }
 
             // Get a new jitter and start time for the next iteration
             jitter = resolution(distribution(gen));
             start = startNext;
+            startNext = endNext;
+            endNext += INTERVAL_PERIOD;
         }
 
         lastInterval_ = startNext;
+        std::cout << "Missed intervals " << missedIntervals << std::endl;
         std::cout << "Shortest interval is  "
             << std::chrono::duration_cast<microsec>(durations.smallest()).count()
             << " us" << std::endl;
@@ -168,6 +172,7 @@ public:
     void doItCount(std::function<void(resolution)> doIt,
                         uint32_t repeat_count) {
         TimeDurations durations;
+        int missedIntervals = 0;
         std::random_device seedGenerator;
         std::mt19937 gen(seedGenerator());
         std::uniform_int_distribution<> distribution(IntervalMin,
@@ -176,7 +181,8 @@ public:
         resolution jitter = resolution(distribution(gen));
         firstInterval_ = my_clock::now();
         my_clock::time_point start{firstInterval_};
-        my_clock::time_point startNext{firstInterval_};
+        my_clock::time_point startNext{start + INTERVAL_PERIOD};
+        my_clock::time_point endNext{startNext + INTERVAL_PERIOD};
 
         uint32_t itr = 0;
         while (itr < repeat_count) {
@@ -186,7 +192,6 @@ public:
             ++itr;
 
             // Collect some stats
-            startNext = start + INTERVAL_PERIOD;
             auto currentTime = my_clock::now();
             durations.insert(currentTime - start);
             std::chrono::steady_clock::time_point jitter_time = start + jitter;
@@ -204,19 +209,23 @@ public:
                 // Wait for the next period start time
                 std::this_thread::sleep_until(startNext);
             } else {
-                std::cout << "Warning: Missed interval " << itr
-                    << ". Jitter: " << jitter.count() << ". Jitter duration: "
-                    << time_span_jitter.count() << ". Duration: "
-                    << time_span_actual.count() << ". Interval Limit: "
-                    << time_span_expected.count() << std::endl;
+                //std::cout << "Warning: Missed interval " << itr
+                //    << ". Jitter: " << jitter.count() << ". Jitter duration: "
+                //    << time_span_jitter.count() << ". Duration: "
+                //    << time_span_actual.count() << ". Interval Limit: "
+                //    << time_span_expected.count() << std::endl;
+                ++missedIntervals;
             }
 
             // Get a new jitter for the next iteration
             jitter = resolution(distribution(gen));
             start = startNext;
+            startNext = endNext;
+            endNext += INTERVAL_PERIOD;
         }
 
         lastInterval_ = my_clock::now();
+        std::cout << "Missed intervals " << missedIntervals << std::endl;
         std::cout << "Shortest interval is  "
             << std::chrono::duration_cast<microsec>(durations.smallest()).count()
             << " us" << std::endl;
