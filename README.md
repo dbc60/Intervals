@@ -1,14 +1,14 @@
 # Intervals and Jitter
 
-The code here is mostly an exercise to help me learn how to use some of the newer features of C++11 and templates in the C++ standard library. There are two functions, `doItCount` and `doItTimed` that accept a `std::function` and run it. The first one runs the function a given number of times, while the second is runs a given function at regular intervals via a call to `start(std::function)` and will continue until `stop()` is called. The nice thing about `doItTimed` is that it compensates for the time used by the called function. As long as the function completes within an interval, `doItTimed` will start it at regular intervals with a slight amount of jitter added to the start time.
+The code here is mostly an exercise to help me learn how to use some of the newer features of C++11 and templates in the C++ standard library. There are two functions, `doItCounted` and `doItTimed` that accept a `std::function` and run it. The first one runs the function a given number of times. It's fairly straight forward.
+
+The second runs a given function at regular intervals via a call to `start(std::function)` and will continue until `stop()` is called. The nice thing about `doItTimed` is that it compensates for the time used by the called function. As long as the function completes within an interval, `doItTimed` will start it at regular intervals with a slight amount of jitter added to the start time.
 
 I thought it would be a good idea to include a random jitter to adjust when the called function is started, because in a distributed environment we might have thousands of clients attempting to connect to a server, or sending a heartbeat signal to that server (to let the server know the client is still online). The network and server will probably function better if those clients don't all send their packets simultaneously. I've heard of such things happening, and it makes devops sad.
 
-The only C++11 feature it uses is type alias, but it doesn't demonstrate it beyond what a typedef could do.
-
 The code uses the following functions and templates from the standard library:
 
-- the `steady_clock`, `system_clock` and `high_resolution_clock` from `std::chrono`
+- `steady_clock`, `system_clock` and `high_resolution_clock` from `std::chrono`
 - `std::chrono::time_point`
 - `std::chrono::duration` and `std::chrono::duration_cast`
 - `std::this_thread`
@@ -22,8 +22,7 @@ The code uses the following functions and templates from the standard library:
 - `std::vector`
 - `std::ostream` (`std::cout` and related I/O functions)
 
-
-Here's some sample output:
+Here is some sample output:
 
 ``` sh
 E:\> Debug\Intervals.exe
