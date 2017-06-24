@@ -16,45 +16,54 @@ using resolution = nanosec;
 using my_clock = std::chrono::steady_clock;
 using duration = my_clock::duration;
 
+// 10 ms == 10,000,000 ns
 #define INTERVAL_PERIOD         resolution(10000000)
+
+// 0.1 ms == 100,000 ns
 #define JITTER_MIN              100000
+
+// 1 ms == 1,000,000 ns
 #define JITTER_MAX              1000000
+
+// Maximum number of iterations to run doItCounted
 #define ITERATION_MAX           400
+
+// 4 s = 4,000,000,000 ns
 #define RUNTIME_LIMIT    resolution(4000000000)
 
 
 class TimeDurations {
-    std::vector<duration> jitters_;
+    std::vector<duration> event_duration_;
     duration smallest_;
     duration largest_;
 
 public:
     TimeDurations()
-        : jitters_(ITERATION_MAX)
+        : event_duration_(ITERATION_MAX)
         , smallest_(resolution::max())
         , largest_(resolution::min()) {
     }
 
     void
-        insert(duration j) {
-        jitters_.push_back(j);
+        insert(duration ed) {
+        event_duration_.push_back(ed);
 
-        if (j < smallest_) {
-            smallest_ = j;
+        if (ed < smallest_) {
+            smallest_ = ed;
         }
 
-        if (j > largest_) {
-            largest_ = j;
+        if (ed > largest_) {
+            largest_ = ed;
         }
     }
 
     duration average() {
         duration result(0);
-        for (auto j : jitters_) {
-            result = result + j;
+        for (auto ed : event_duration_) {
+            result = result + ed;
         }
 
-        result /= jitters_.size();
+        result /= event_duration_.size();
 
         return result;
     }
@@ -71,8 +80,8 @@ public:
 
     duration
         median() {
-        std::sort(jitters_.begin(), jitters_.end());
-        return jitters_[jitters_.size() / 2];
+        std::sort(event_duration_.begin(), event_duration_.end());
+        return event_duration_[event_duration_.size() / 2];
     }
 };
 
@@ -80,174 +89,148 @@ public:
 template <int IntervalMin, int IntervalMax>
 class PeriodicTimer {
 private:
-    volatile bool is_running_ = false;
-    std::future<int> pending_;
-    my_clock::time_point firstInterval_;
-    my_clock::time_point lastInterval_;
+    volatile bool           is_running_ = false;
+    std::future<int>        pending_;
+    /* Record the time if the first and last intervals to calculate the total
+    time in which do_it() is executed.
+    */
+    my_clock::time_point    interval_first_;
+    my_clock::time_point    interval_last_;
 
-    //! @brief call doIt until stop() is called, and return the number of
-    // iterations for which doIt was called.
-    int doItTimed(std::function<void(duration)> doIt) {
+    //! @brief call do_it until stop() is called, and return the number of
+    // iterations for which do_it was called.
+    int doItTimed(std::function<void(duration)> do_it) {
         TimeDurations durations;
         int result = 0;
-        int missedIntervals = 0;
-        std::random_device seedGenerator;
-        std::mt19937 gen(seedGenerator());
+        int missed_intervals = 0;
+        std::random_device seed_generator;
+        std::mt19937 gen(seed_generator());
         std::uniform_int_distribution<> distribution(IntervalMin,
                                                      IntervalMax);
         resolution jitter = resolution(distribution(gen));
-        firstInterval_ = my_clock::now();
-        my_clock::time_point start{firstInterval_};
-        my_clock::time_point startNext{start + INTERVAL_PERIOD};
-        my_clock::time_point endNext(startNext + INTERVAL_PERIOD) ;
+        my_clock::time_point time_current;
+        my_clock::time_point time_start_do_it;
+
+        // Set the time of the first interval
+        interval_first_ = my_clock::now();
+        my_clock::time_point interval_current_start{interval_first_};
+        my_clock::time_point interval_next_start{interval_current_start + INTERVAL_PERIOD};
+        my_clock::time_point time_do_it = interval_current_start + jitter;
 
         while (is_running_) {
-            // Delay the function call for a small random amount of time.
-            std::this_thread::sleep_for(jitter);
-            doIt(jitter);
-            ++result;
-
-            auto currentTime = my_clock::now();
-            durations.insert(currentTime - start);
-            std::chrono::steady_clock::time_point jitter_time = start + jitter;
-            std::chrono::duration<double> time_span_jitter
-                = std::chrono::duration_cast<std::chrono::duration<double>>(
-                    jitter_time - start);
-            std::chrono::duration<double> time_span_actual
-                = std::chrono::duration_cast<std::chrono::duration<double>>(
-                    currentTime - start);
-            std::chrono::duration<double> time_span_expected
-                = std::chrono::duration_cast<std::chrono::duration<double>>(
-                    startNext - start);
-
-            /* Some days it takes just over 10 ms to run doIt(), so it helps
-            to see what's happening. As it is, doIt() regularly takes over 3 ms
-            on my old 2.4 GHz core i5 desktop, running Windows 10. That seems
-            excessive.
-            */
-            if (currentTime < endNext) {
-                // Wait for the next period start time
-                std::this_thread::sleep_until(startNext);
+            time_current = my_clock::now();
+            if (time_current < time_do_it) {
+                // Wait for the next interval + jitter
+                std::this_thread::sleep_until(time_do_it);
             } else {
-                //std::cout << "Warning: Missed interval " << result
-                //    << ". Jitter: " << jitter.count() << ". Jitter duration: "
-                //    << time_span_jitter.count() << ". Duration: "
-                //    << time_span_actual.count() << ". Interval Limit: "
-                //    << time_span_expected.count() << std::endl;
-                ++missedIntervals;
+                // Count the interval as missed and run do_it immediately
+                ++missed_intervals;
             }
 
-            // Get a new jitter and start time for the next iteration
+            // Get current time to more accurately measure do_it()'s duration 
+            time_start_do_it = my_clock::now();
+            do_it(jitter);
+
+            // Record the duration of do_it
+            time_current = my_clock::now();
+            durations.insert(time_current - time_start_do_it);
+
+            // Update the iteration count
+            ++result;
+
+            // Get a new jitter for the next iteration
             jitter = resolution(distribution(gen));
-            start = startNext;
-            startNext = endNext;
-            endNext += INTERVAL_PERIOD;
+
+            // Update the start times for the next interval
+            interval_current_start = interval_next_start;
+            interval_next_start += INTERVAL_PERIOD;
+            time_do_it = interval_current_start + jitter;
         }
 
-        lastInterval_ = startNext;
-        std::cout << "Missed intervals " << missedIntervals << std::endl;
+        interval_last_ = interval_current_start;
+        std::cout << "Missed intervals " << missed_intervals << std::endl;
         std::cout << "Shortest interval is  "
-            << std::chrono::duration_cast<microsec>(durations.smallest()).count()
-            << " us" << std::endl;
+            << durations.smallest().count() << " ns" << std::endl;
         std::cout << "Longest interval is   "
-            << std::chrono::duration_cast<microsec>(durations.largest()).count()
-            << " us" << std::endl;
+            << durations.largest().count() << " ns" << std::endl;
         std::cout << "Average interval is   "
-            << std::chrono::duration_cast<microsec>(durations.average()).count()
-            << " us" << std::endl;
+            << durations.average().count() << " ns" << std::endl;
         std::cout << "Median interval is:   "
-            << std::chrono::duration_cast<microsec>(durations.median()).count()
-            << " us" << std::endl << std::endl;
+            << durations.median().count()  << " ns" << std::endl << std::endl;
 
         return result;
     }
 
 public:
-    //! @brief call doIt for repeat_count iterations. 
-    // A random delay (jitter) is calculated for each call to doIt. If doIt
-    // runs for less than the delay, doItCount will wait for the remaining time
-    // before the next interval. If doIt takes more time than the delay, the
-    // next iteration takes place immediately. This way, doIt is called no more
+    //! @brief call do_it for repeat_count iterations. 
+    // A random delay (jitter) is calculated for each call to do_it. If do_it
+    // runs for less than the delay, doItCounted will wait for the remaining time
+    // before the next interval. If do_it takes more time than the delay, the
+    // next iteration takes place immediately. This way, do_it is called no more
     // often than
-    void doItCount(std::function<void(resolution)> doIt,
-                        uint32_t repeat_count) {
+    void doItCounted(std::function<void(resolution)> do_it,
+                     uint32_t repeat_count) {
         TimeDurations durations;
-        int missedIntervals = 0;
-        std::random_device seedGenerator;
-        std::mt19937 gen(seedGenerator());
+        int missed_intervals = 0;
+        std::random_device seed_generator;
+        std::mt19937 gen(seed_generator());
         std::uniform_int_distribution<> distribution(IntervalMin,
                                                      IntervalMax);
 
         resolution jitter = resolution(distribution(gen));
-        firstInterval_ = my_clock::now();
-        my_clock::time_point start{firstInterval_};
-        my_clock::time_point startNext{start + INTERVAL_PERIOD};
-        my_clock::time_point endNext{startNext + INTERVAL_PERIOD};
+        my_clock::time_point time_current;
+        my_clock::time_point time_start_do_it;
+
+        // Set the time of the first interval
+        interval_first_ = my_clock::now();
+        my_clock::time_point interval_current_start{interval_first_};
+        my_clock::time_point interval_next_start{interval_current_start + INTERVAL_PERIOD};
+        my_clock::time_point time_do_it = interval_current_start + jitter;
 
         uint32_t itr = 0;
         while (itr < repeat_count) {
-            // Delay the function call for a small random amount of time.
-            std::this_thread::sleep_for(jitter);
-            doIt(jitter);
-            ++itr;
-
-            // Collect some stats
-            auto currentTime = my_clock::now();
-            durations.insert(currentTime - start);
-            std::chrono::steady_clock::time_point jitter_time = start + jitter;
-            std::chrono::duration<double> time_span_jitter
-                = std::chrono::duration_cast<std::chrono::duration<double>>(
-                    jitter_time - start);
-            std::chrono::duration<double> time_span_actual
-                = std::chrono::duration_cast<std::chrono::duration<double>>(
-                    currentTime - start);
-            std::chrono::duration<double> time_span_expected
-                = std::chrono::duration_cast<std::chrono::duration<double>>(
-                    startNext - start);
-
-            if (currentTime < startNext) {
-                // Wait for the next period start time
-                std::this_thread::sleep_until(startNext);
-            } else {
-                //std::cout << "Warning: Missed interval " << itr
-                //    << ". Jitter: " << jitter.count() << ". Jitter duration: "
-                //    << time_span_jitter.count() << ". Duration: "
-                //    << time_span_actual.count() << ". Interval Limit: "
-                //    << time_span_expected.count() << std::endl;
-                ++missedIntervals;
+            time_current = my_clock::now();
+            if (time_current < time_do_it) {
+                // Sleep until jitter ns beyond the interval
+                std::this_thread::sleep_until(time_do_it);
             }
+
+            time_start_do_it = my_clock::now();
+            do_it(jitter);
+            // Collect some stats
+            time_current = my_clock::now();
+            durations.insert(time_current - time_start_do_it);
+            ++itr;
 
             // Get a new jitter for the next iteration
             jitter = resolution(distribution(gen));
-            start = startNext;
-            startNext = endNext;
-            endNext += INTERVAL_PERIOD;
+
+            // Update the start times for the next interval
+            interval_current_start = interval_next_start;
+            interval_next_start += INTERVAL_PERIOD;
+            time_do_it = interval_current_start + jitter;
         }
 
-        lastInterval_ = my_clock::now();
-        std::cout << "Missed intervals " << missedIntervals << std::endl;
+        interval_last_ = interval_current_start;
+        std::cout << "Missed intervals " << missed_intervals << std::endl;
         std::cout << "Shortest interval is  "
-            << std::chrono::duration_cast<microsec>(durations.smallest()).count()
-            << " us" << std::endl;
+            << durations.smallest().count() << " ns" << std::endl;
         std::cout << "Longest interval is   "
-            << std::chrono::duration_cast<microsec>(durations.largest()).count()
-            << " us" << std::endl;
+            << durations.largest().count() << " ns" << std::endl;
         std::cout << "Average interval is   "
-            << std::chrono::duration_cast<microsec>(durations.average()).count()
-            << " us" << std::endl;
+            << durations.average().count() << " ns" << std::endl;
         std::cout << "Median interval is:   "
-            << std::chrono::duration_cast<microsec>(durations.median()).count()
-            << " us" << std::endl << std::endl;
+            << durations.median().count() << " ns" << std::endl << std::endl;
     }
 
-    void start(std::function<void(resolution)> doIt) {
+    void interval_current_start(std::function<void(resolution)> do_it) {
         is_running_ = true;
         // Run doItTimed on another thread, passing the "this" pointer and the
         // function doItTimed must run until stop() is executed.
         auto f = std::async(std::launch::async,
                             &PeriodicTimer::doItTimed,
                             this,
-                            doIt);
+                            do_it);
         // Move the future to another variable so we don't wait for it here.
         pending_ = std::move(f);
     }
@@ -261,13 +244,13 @@ public:
     }
 
     my_clock::duration runtime() const {
-        return lastInterval_ - firstInterval_;
+        return interval_last_ - interval_first_;
     }
 };
 
 
 void main() {
-    TimeDurations jitter1;
+    TimeDurations durations1;
     const resolution jitterMin = resolution(JITTER_MIN);
     const resolution jitterMax = resolution(JITTER_MAX);
     const resolution repeatInterval = INTERVAL_PERIOD;
@@ -299,8 +282,8 @@ void main() {
 
     /*** Iteration Test ***/
     std::cout << "Jitter test 1. Iterations: " << ITERATION_MAX << std::endl;
-    timer.doItCount(std::bind(&TimeDurations::insert, &jitter1, std::placeholders::_1), ITERATION_MAX);
-    auto runtime = timer.runtime();
+    timer.doItCounted(std::bind(&TimeDurations::insert, &durations1, std::placeholders::_1), ITERATION_MAX);
+    resolution runtime = timer.runtime();
 
     std::cout << "Iterations            " << ITERATION_MAX << std::endl;
     std::cout << "Expected elapsed time "
@@ -310,27 +293,27 @@ void main() {
         << std::chrono::duration_cast<millisec>(runtime).count()
         << " ms" << std::endl;
     std::cout << "Smallest jitter is    "
-        << std::chrono::duration_cast<microsec>(jitter1.smallest()).count()
+        << std::chrono::duration_cast<microsec>(durations1.smallest()).count()
         << " us" << std::endl;
     std::cout << "Largest jitter is     "
-        << std::chrono::duration_cast<microsec>(jitter1.largest()).count()
+        << std::chrono::duration_cast<microsec>(durations1.largest()).count()
         << " us" << std::endl;
     std::cout << "Average jitter is     "
-        << std::chrono::duration_cast<microsec>(jitter1.average()).count()
+        << std::chrono::duration_cast<microsec>(durations1.average()).count()
         << " us" << std::endl;
     std::cout << "Median jitter is      "
-        << std::chrono::duration_cast<microsec>(jitter1.median()).count()
+        << std::chrono::duration_cast<microsec>(durations1.median()).count()
         << " us" << std::endl;
 
     std::cout << std::endl;
 
     /*** Timed Test ***/
-    TimeDurations jitter2;
+    TimeDurations durations2;
     const resolution iterationTimeLimit = RUNTIME_LIMIT;
     std::cout << "Jitter test 2. Timed : "
         << std::chrono::duration_cast<millisec>(iterationTimeLimit).count() << " ms" << std::endl;
 
-    timer.start(std::bind(&TimeDurations::insert, &jitter2, std::placeholders::_1));
+    timer.interval_current_start(std::bind(&TimeDurations::insert, &durations2, std::placeholders::_1));
     std::this_thread::sleep_for(iterationTimeLimit);
     int iterations = timer.stop();
     runtime = timer.runtime();
@@ -342,16 +325,16 @@ void main() {
         << std::chrono::duration_cast<millisec>(runtime).count()
         << " ms" << std::endl;
     std::cout << "Smallest jitter is  "
-        << std::chrono::duration_cast<microsec>(jitter2.smallest()).count()
+        << std::chrono::duration_cast<microsec>(durations2.smallest()).count()
         << " us" << std::endl;
     std::cout << "Largest jitter is   "
-        << std::chrono::duration_cast<microsec>(jitter2.largest()).count()
+        << std::chrono::duration_cast<microsec>(durations2.largest()).count()
         << " us" << std::endl;
     std::cout << "Average jitter is   "
-        << std::chrono::duration_cast<microsec>(jitter2.average()).count()
+        << std::chrono::duration_cast<microsec>(durations2.average()).count()
         << " us" << std::endl;
     std::cout << "Median jitter is:   "
-        << std::chrono::duration_cast<microsec>(jitter2.median()).count()
+        << std::chrono::duration_cast<microsec>(durations2.median()).count()
         << " us" << std::endl;
 }
 

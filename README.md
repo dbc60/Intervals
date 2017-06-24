@@ -26,7 +26,7 @@ The code uses the following functions and templates from the standard library:
 Here's some sample output:
 
 ``` sh
-E:\> Intervals.exe
+E:\> Debug\Intervals.exe
 The resolution of the high-resolution clock is: 1e-09 sec
 The resolution of the steady clock is:          1e-09 sec
 The resolution of the system clock is:          1e-07 sec
@@ -37,24 +37,36 @@ Jitter Tests.
   Max Jitter: 1000 us
 
 Jitter test 1. Iterations: 400
+Missed intervals 0
+Shortest interval is  4697 ns
+Longest interval is   41843 ns
+Average interval is   5339 ns
+Median interval is:   4697 ns
+
 Iterations            400
 Expected elapsed time 4000 ms
-Actual elapsed time   4001 ms
+Actual elapsed time   4000 ms
 Smallest jitter is    100 us
-Largest jitter is     999 us
-Average jitter is     281 us
+Largest jitter is     996 us
+Average jitter is     279 us
 Median jitter is      100 us
 
 Jitter test 2. Timed : 4000 ms
-Expected iterations 400
-Actual iterations   400
-Elapsed time        4000 ms
+Missed intervals 0
+Shortest interval is  4269 ns
+Longest interval is   96922 ns
+Average interval is   5663 ns
+Median interval is:   4269 ns
+
+Expected iterations 401
+Actual iterations   401
+Elapsed time        4010 ms
 Smallest jitter is  100 us
 Largest jitter is   999 us
-Average jitter is   279 us
+Average jitter is   269 us
 Median jitter is:   100 us
 
-E:\> Intervals.exe
+E:\> Release\Intervals.exe
 The resolution of the high-resolution clock is: 1e-09 sec
 The resolution of the steady clock is:          1e-09 sec
 The resolution of the system clock is:          1e-07 sec
@@ -65,20 +77,31 @@ Jitter Tests.
   Max Jitter: 1000 us
 
 Jitter test 1. Iterations: 400
+Missed intervals 0
+Shortest interval is  0 ns
+Longest interval is   13663 ns
+Average interval is   251 ns
+Median interval is:   0 ns
+
 Iterations            400
 Expected elapsed time 4000 ms
-Actual elapsed time   4001 ms
-Smallest jitter is    101 us
-Largest jitter is     999 us
-Average jitter is     264 us
-Median jitter is      101 us
+Actual elapsed time   4000 ms
+Smallest jitter is    103 us
+Largest jitter is     998 us
+Average jitter is     274 us
+Median jitter is      103 us
 
 Jitter test 2. Timed : 4000 ms
+Missed intervals 0
+Shortest interval is  0 ns
+Longest interval is   53798 ns
+Average interval is   356 ns
+Median interval is:   0 ns
+
 Expected iterations 401
 Actual iterations   401
 Elapsed time        4010 ms
-Smallest jitter is  104 us
-Largest jitter is   999 us
-Average jitter is   272 us
-Median jitter is:   104 us
-```
+Smallest jitter is  101 us
+Largest jitter is   998 us
+Average jitter is   281 us
+Median jitter is:   101 us```
