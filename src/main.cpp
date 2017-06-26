@@ -5,6 +5,7 @@
 #include <functional>
 #include <random>
 #include <iostream>
+#include <iomanip>
 #include <vector>
 #include <algorithm>
 
@@ -31,6 +32,8 @@ using duration = my_clock::duration;
 // 4 s = 4,000,000,000 ns
 #define RUNTIME_LIMIT    resolution(4000000000)
 
+// Define a consistant display width for various values
+#define DWIDTH  5
 
 class TimeDurations {
     std::vector<duration> event_duration_;
@@ -148,15 +151,20 @@ private:
         }
 
         interval_last_ = interval_current_start;
-        std::cout << "Missed intervals " << missed_intervals << std::endl;
-        std::cout << "Shortest interval is  "
-            << durations.smallest().count() << " ns" << std::endl;
-        std::cout << "Longest interval is   "
-            << durations.largest().count() << " ns" << std::endl;
-        std::cout << "Average interval is   "
-            << durations.average().count() << " ns" << std::endl;
-        std::cout << "Median interval is:   "
-            << durations.median().count()  << " ns" << std::endl << std::endl;
+        std::cout << "Missed intervals:           " << std::setw(DWIDTH)
+            << std::setfill(' ') << missed_intervals << std::endl;
+        std::cout << "Shortest execution time is  " << std::setw(DWIDTH)
+            << std::setfill(' ') << durations.smallest().count() << " ns"
+            << std::endl;
+        std::cout << "Longest execution time is   " << std::setw(DWIDTH)
+            << std::setfill(' ') << durations.largest().count() << " ns"
+            << std::endl;
+        std::cout << "Average execution time is   " << std::setw(DWIDTH)
+            << std::setfill(' ') << durations.average().count() << " ns"
+            << std::endl;
+        std::cout << "Median execution time is:   " << std::setw(DWIDTH)
+            << std::setfill(' ') << durations.median().count()  << " ns"
+            << std::endl << std::endl;
 
         return result;
     }
@@ -212,15 +220,20 @@ public:
         }
 
         interval_last_ = interval_current_start;
-        std::cout << "Missed intervals " << missed_intervals << std::endl;
-        std::cout << "Shortest interval is  "
-            << durations.smallest().count() << " ns" << std::endl;
-        std::cout << "Longest interval is   "
-            << durations.largest().count() << " ns" << std::endl;
-        std::cout << "Average interval is   "
-            << durations.average().count() << " ns" << std::endl;
-        std::cout << "Median interval is:   "
-            << durations.median().count() << " ns" << std::endl << std::endl;
+        std::cout << "Missed intervals:           " << std::setw(DWIDTH)
+            << std::setfill(' ') << missed_intervals << std::endl;
+        std::cout << "Shortest execution time is: " << std::setw(DWIDTH)
+            << std::setfill(' ') << durations.smallest().count()
+            << " ns" << std::endl;
+        std::cout << "Longest execution time is:  " << std::setw(DWIDTH)
+            << std::setfill(' ') << durations.largest().count()
+            << " ns" << std::endl;
+        std::cout << "Average execution time is:  " << std::setw(DWIDTH)
+            << std::setfill(' ') << durations.average().count()
+            << " ns" << std::endl;
+        std::cout << "Median execution time is:   " << std::setw(DWIDTH)
+            << std::setfill(' ') << durations.median().count()
+            << " ns" << std::endl << std::endl;
     }
 
     void interval_current_start(std::function<void(resolution)> do_it) {
@@ -267,74 +280,107 @@ void main() {
     std::cout << "The resolution of the system clock is:          "
         << (static_cast<double>(std::chrono::system_clock::period::num)
             / std::chrono::system_clock::period::den)
-        << " sec" << std::endl << std::endl;
+        << " sec" << std::endl;
 
-    std::cout << "Jitter Tests." << std::endl
-        << "  Interval:   "
+    std::cout << std::endl << std::endl;
+
+    std::cout << "Test settings." << std::endl
+        << "  Interval:   " << std::setw(DWIDTH) << std::setfill(' ')
         << std::chrono::duration_cast<millisec>(repeatInterval).count()
         << " ms" << std::endl
-        << "  Min Jitter: "
+        << "  Min Jitter: " << std::setw(DWIDTH) << std::setfill(' ')
         << std::chrono::duration_cast<microsec>(jitterMin).count() << " us"
         << std::endl
-        << "  Max Jitter: "
+        << "  Max Jitter: " << std::setw(DWIDTH) << std::setfill(' ')
         << std::chrono::duration_cast<microsec>(jitterMax).count() << " us"
-        << std::endl << std::endl;
+        << std::endl;
+
+    std::cout << std::endl << std::endl;
 
     /*** Iteration Test ***/
-    std::cout << "Jitter test 1. Iterations: " << ITERATION_MAX << std::endl;
-    timer.doItCounted(std::bind(&TimeDurations::insert, &durations1, std::placeholders::_1), ITERATION_MAX);
+    std::cout << "Jitter test 1. Iterations:  " << std::setw(DWIDTH)
+        << std::setfill(' ') << ITERATION_MAX << std::endl;
+
+    // Execute TimeDurations::insert() a limited number of times, and retrieve
+    // the actual run time.
+    timer.doItCounted(std::bind(&TimeDurations::insert,
+                                &durations1,
+                                std::placeholders::_1),
+                      ITERATION_MAX);
     resolution runtime = timer.runtime();
 
-    std::cout << "Iterations            " << ITERATION_MAX << std::endl;
-    std::cout << "Expected elapsed time "
-        << (ITERATION_MAX * std::chrono::duration_cast<millisec>(repeatInterval).count())
+    // Display runtime statistics
+    std::cout << "Iterations:                 " << std::setw(DWIDTH)
+        << std::setfill(' ') << ITERATION_MAX << std::endl;
+    std::cout << "Expected elapsed time:      " << std::setw(DWIDTH)
+        << std::setfill(' ') << (ITERATION_MAX
+            * std::chrono::duration_cast<millisec>(repeatInterval).count())
         << " ms" << std::endl;
-    std::cout << "Actual elapsed time   "
+    std::cout << "Actual elapsed time:        " << std::setw(DWIDTH)
+        << std::setfill(' ')
         << std::chrono::duration_cast<millisec>(runtime).count()
         << " ms" << std::endl;
-    std::cout << "Smallest jitter is    "
+    std::cout << "Smallest jitter is:         " << std::setw(DWIDTH)
+        << std::setfill(' ')
         << std::chrono::duration_cast<microsec>(durations1.smallest()).count()
         << " us" << std::endl;
-    std::cout << "Largest jitter is     "
+    std::cout << "Largest jitter is:          " << std::setw(DWIDTH)
+        << std::setfill(' ')
         << std::chrono::duration_cast<microsec>(durations1.largest()).count()
         << " us" << std::endl;
-    std::cout << "Average jitter is     "
+    std::cout << "Average jitter is:          " << std::setw(DWIDTH)
+        << std::setfill(' ')
         << std::chrono::duration_cast<microsec>(durations1.average()).count()
         << " us" << std::endl;
-    std::cout << "Median jitter is      "
+    std::cout << "Median jitter is:           " << std::setw(DWIDTH)
+        << std::setfill(' ')
         << std::chrono::duration_cast<microsec>(durations1.median()).count()
         << " us" << std::endl;
 
-    std::cout << std::endl;
+    std::cout << std::endl << std::endl;
 
     /*** Timed Test ***/
     TimeDurations durations2;
     const resolution iterationTimeLimit = RUNTIME_LIMIT;
-    std::cout << "Jitter test 2. Timed : "
-        << std::chrono::duration_cast<millisec>(iterationTimeLimit).count() << " ms" << std::endl;
+    std::cout << "Jitter test 2. Timed:       " << std::setw(DWIDTH)
+        << std::setfill(' ')
+        << std::chrono::duration_cast<millisec>(iterationTimeLimit).count()
+        << " ms" << std::endl;
 
-    timer.interval_current_start(std::bind(&TimeDurations::insert, &durations2, std::placeholders::_1));
+    // Start the timed execution of TimeDurations::insert() on another thread
+    timer.interval_current_start(std::bind(&TimeDurations::insert,
+                                           &durations2,
+                                           std::placeholders::_1));
+
+    // Wait for the time limit, stop the running thread, retrieve the iteration
+    // count, and the actual run time.
     std::this_thread::sleep_for(iterationTimeLimit);
     int iterations = timer.stop();
     runtime = timer.runtime();
 
-    std::cout << "Expected iterations " << runtime / repeatInterval
-        << std::endl;
-    std::cout << "Actual iterations   " << iterations << std::endl;
-    std::cout << "Elapsed time        "
+    // Display some statistics
+    std::cout << "Expected iterations         " << std::setw(DWIDTH)
+        << std::setfill(' ') << runtime / repeatInterval << std::endl;
+    std::cout << "Actual iterations           " << std::setw(DWIDTH)
+        << std::setfill(' ') << iterations << std::endl;
+    std::cout << "Elapsed time                " << std::setw(DWIDTH)
+        << std::setfill(' ')
         << std::chrono::duration_cast<millisec>(runtime).count()
         << " ms" << std::endl;
-    std::cout << "Smallest jitter is  "
+    std::cout << "Smallest jitter is          " << std::setw(DWIDTH)
+        << std::setfill(' ')
         << std::chrono::duration_cast<microsec>(durations2.smallest()).count()
         << " us" << std::endl;
-    std::cout << "Largest jitter is   "
+    std::cout << "Largest jitter is           " << std::setw(DWIDTH)
+        << std::setfill(' ')
         << std::chrono::duration_cast<microsec>(durations2.largest()).count()
         << " us" << std::endl;
-    std::cout << "Average jitter is   "
+    std::cout << "Average jitter is           " << std::setw(DWIDTH)
+        << std::setfill(' ')
         << std::chrono::duration_cast<microsec>(durations2.average()).count()
         << " us" << std::endl;
-    std::cout << "Median jitter is:   "
+    std::cout << "Median jitter is:           " << std::setw(DWIDTH)
+        << std::setfill(' ')
         << std::chrono::duration_cast<microsec>(durations2.median()).count()
         << " us" << std::endl;
 }
-
